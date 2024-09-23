@@ -1,4 +1,5 @@
 #! python3
+# Script para conversão de arquivos .csv em .kml
 
 versão = '2.4'
 
