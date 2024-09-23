@@ -1,6 +1,6 @@
 #! python3
 
-versão = '2.3'
+versão = '2.4'
 
 banner = r'''
     ____  __._____.___.__________ ________    _______     ________________
@@ -254,8 +254,8 @@ check_and_install_libraries()
 import chardet
 import pandas as pd
 import exifread
-from PIL import Image, PngImagePlugin
-from PIL.ExifTags import TAGS, GPSTAGS
+from PIL import Image, PngImagePlugin, ExifTags
+# from PIL.ExifTags import TAGS, GPSTAGS
 
 # Configuração de categorias
 cat_to_icon = {'Sem Categoria': 'https://cdn-icons-png.flaticon.com/512/5999/5999673.png'}
@@ -456,7 +456,7 @@ def get_exif_data(img_path):
     info = img._getexif()
     if info:
         for tag, value in info.items():
-            tag_name = TAGS.get(tag, tag)
+            tag_name = ExifTags.TAGS.get(tag, tag)
             exif_data[tag_name] = value
     return exif_data
 
@@ -636,11 +636,27 @@ def kml_folders_gen(placemarks):
 
 # Função para realizar conversão de imagem jpg para png, acrescentando metadados de geolocalização
 def jpg2png(entrada, saida, lat, lon):
+    print(f'Convertendo imagem de {entrada} para {saida}')
     if not os.path.exists(entrada):
         logging.error(f'{entrada} não existe.')
         return
+    
     try:
         with Image.open(entrada) as img:
+            # Verifica a orientação da imagem nos metadados EXIF
+            exif = img._getexif()
+            if exif is not None:
+                for tag, value in exif.items():
+                    tag_name = ExifTags.TAGS.get(tag, tag)
+                    if tag_name == 'Orientation':
+                        # Aplica a rotação conforme a orientação
+                        if value == 3:
+                            img = img.rotate(180, expand=True)
+                        elif value == 6:
+                            img = img.rotate(270, expand=True)
+                        elif value == 8:
+                            img = img.rotate(90, expand=True)
+
             img = img.convert('RGB')
             
             # Salva a imagem PNG e adiciona metadados
