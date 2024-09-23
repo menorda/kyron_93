@@ -334,7 +334,6 @@ def setup():
             filtro = 'Keywords'
             if row[filtro] != '':
                 cat_filter[row.get('Cat', 'Sem Categoria')] = row[filtro]
-    print(cat_hide)
 
 # Função para converter coordenadas geográficas em grau decimal
 def gms2dec(coord):
@@ -466,9 +465,9 @@ def get_coordinates(tags):
     lat = tags.get('GPS GPSLatitude')
     lat_ref = tags.get('GPS GPSLatitudeRef')
     lon = tags.get('GPS GPSLongitude')
-    # <--- PRECEDE, GUIA E LIDERA!
     lon_ref = tags.get('GPS GPSLongitudeRef')
 
+    # <--- PRECEDE, GUIA E LIDERA!
     def convert_to_degrees(value_tags, dir_tag):
         g = float(value_tags[0].num) / float(value_tags[0].den)
         m = float(value_tags[1].num) / float(value_tags[1].den)
@@ -1039,7 +1038,6 @@ def kml_gen(csv_path):
     #gera as pastas e monta o kml
     kml, valid_cats = kml_folders_gen(placemarks)
     estilo = ''
-    print(valid_cats)
     if esconde_nome:
         estilo = style_gen(valid_cats, cat_to_icon)
     kml = kml_header + estilo + kml + kml_footer
