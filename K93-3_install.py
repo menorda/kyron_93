@@ -1,7 +1,6 @@
 #! python3
-# Script para conversão de arquivos .csv em .kml
 
-versão = '2.4'
+versão = '2.7'
 
 banner = r'''
     ____  __._____.___.__________ ________    _______     ________________
@@ -104,7 +103,7 @@ with open("memento.txt", "w") as f:
     MTM, em parceria com ChatGPT.
     ''')
 
-import os, re, subprocess, sys, csv, logging
+import os, re, subprocess, sys, csv, logging, shutil
 logging.getLogger('chardet.charsetprober').setLevel(logging.INFO)
 logging.basicConfig(filename='log.txt', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', encoding='UTF-8')
 
@@ -153,14 +152,14 @@ def preopen(arquivo):
 def normalize_headers(headers):
     header_map = {
         'Cat': r'\b(cat(egoria|egorizad[oa])?s?|tipos?)\b',
-        'Lat': r'\b(lat(itude)?s?)\b',
+        'Coor': r'\b(coo?rd?(enada[s]?)?|\blat.*\blon)\b',        
+        'Lat': r'\b(lat(itude)?s?)\b(?!.*lon)',
         'Lon': r'\b(lon(g|gitude)?s?)\b',
         'Decri': r'\b(des?cri([çcÇ]([aãÃ]o|[oõÕ]es))?|eventos?)\b',
         'Nome': r'\b(nomes?|t[íÍ]tulos?)\b',
         'Icone': r'\b([iíÍ]cone?s?)\b',
         'Regex': r'\b(e[sx]press([Ãã]o|[oõÕ]es)(\sregular(?:es)?]?)?|regex)\b',
         'Img': r'\b(ima?g(em|ens)?)\b',
-        'Coor': r'\b(coo?rd?(enada[s]?)?)\b',
         'Alt': r'\b(alt(u|ura|itude)?)\b',
         'Data': r'\b(dat[ae]s?|GDH)',
         'Hora': r'\b(hor[aá]s?(?:rio)?)\b',
@@ -353,6 +352,8 @@ def gms2dec(coord):
 
 # Função para desconverter coordenadas geográficas, de grau decimal para graus minutos e segundos
 def dec2gms(coord, tipo):
+    if coord == None:
+        return
     # Define a direção
     dir = 'N'
     if coord < 0:
@@ -392,7 +393,7 @@ def dividir(coord):
     
     # Fraciona Lat e Long
     # regex = r'((?<=[NSLEOW\-\/])[,\/\s]+|(?<=[0-9]),\s|(?<=[0-9])[,\s](?=[+\-]|[0-9]))'
-    regex = r'((?<=[SLOWEN0-9])(\s?[,\/\-]\s?)|(?<=[SLOWEN])\s(?=[+\-\d]))'
+    regex = r'((?<=[SLOWEN0-9])(\s?[;,\/\-]\s?)|(?<=[SLOWEN])\s(?=[+\-\d]))'
     dividido = re.split(regex, coord)
     
     if len(dividido) < 2:
@@ -405,17 +406,31 @@ def dividir(coord):
 
 # Função para capturar coordenadas geográficas
 def capturar(coord):
+    logging.warning(f'Tentando capturar: {coord}')
     coord = coord.strip()
     coord = re.sub(r'\s{2,}', ' ', coord)
     coord = re.sub(',', '.', coord)
-    regex = r'^([+-]?\d+\.?\d*)[°ºo]?\s*(\d*\.?\d*)?[\'’`]*\s*(\d*\.?\d*)?["“”]?\s*([NSEOWL]?)$'
-    match = re.match(regex, coord)
+    coord = re.sub(r'^\"', '', coord)
+    coord = re.sub(r'(?<!\d)\"$', '', coord)
+    coord = re.sub(r'([^\d])\1+', r'\1', coord)
+    regex1 = r'^([+-]?\d+\.?\d*)[°ºo]?\s*(\d*\.?\d*)?[\'’`]*\s*(\d*\.?\d*)?[\"“”]?\s*([NSEOWL]?)$'
+    #regex2 = r'(?:([+-]?\d+\.?\d*)(?=[°ºo\s])(?!\d))?\D*?(?:(\d+\.?\d*)(?=[\'’`\s]))?(?!\d)\D*?(?:(\d+\.?\d*)(?=[\"“”\s]))?[^SLOWEN]?([SLOWEN])?'
+    regex3 = r'([+-]?\d+[\.,]?\d*)[^0-9\.,]?\s*(\d+[\.,]?\d*)?[^0-9\.,]?\s*(\d+[\.,]?\d*)?[^SLOWEN]*([NSEOWL])?'
+    match1 = re.match(regex1, coord)
+    match3 = re.match(regex3, coord)
+    if match1:
+        logging.debug(f'Match 1: {match1.groups()}')
+        match = match1
+    else:
+        logging.debug(f'Match 3: {match3.groups()}')
+        match = match3
     if match:
         deg = float(match.group(1))
         minutes = float(match.group(2)) if match.group(2) else 0
         seconds = float(match.group(3)) if match.group(3) else 0
         direction = match.group(4)
         newcoord = (deg, minutes, seconds, direction)
+        logging.debug(f'Capturado: {newcoord}')
         newcoord = gms2dec(newcoord)
     else:
         try:
@@ -452,6 +467,7 @@ def get_exif_data(img_path):
         img = Image.open(img_path)
     except:
         logging.error(f'A imagem {img} não pode ser aberta.')
+        # <--- PRECEDE, GUIA E LIDERA!
         return
     exif_data = {}
     info = img._getexif()
@@ -468,7 +484,6 @@ def get_coordinates(tags):
     lon = tags.get('GPS GPSLongitude')
     lon_ref = tags.get('GPS GPSLongitudeRef')
 
-    # <--- PRECEDE, GUIA E LIDERA!
     def convert_to_degrees(value_tags, dir_tag):
         g = float(value_tags[0].num) / float(value_tags[0].den)
         m = float(value_tags[1].num) / float(value_tags[1].den)
@@ -515,7 +530,8 @@ def autocat(texto, dicionario):
 
 # Função para leitura de headers
 def head_read(arquivo):
-    with open(arquivo, mode='r', newline='', encoding='utf-8') as arquivo_csv:
+    encoding = preopen(arquivo)
+    with open(arquivo, mode='r', newline='', encoding=encoding) as arquivo_csv:
         leitor = csv.reader(arquivo_csv)
         # Lê a primeira linha, que contém os headers
         headers = next(leitor, [])
@@ -585,6 +601,7 @@ def kml_placemark_gen(nome, cat, lat, lon, decri, raw_img='', alt=0, date=None, 
             icone = cat_to_icon[cat]
         else:
             icone = os.path.join(os.path.abspath('.'), 'icones', cat_to_icon[cat])
+        logging.debug(f'Icone: {icone}')
         style = f'''
         <Style>
             <IconStyle>
@@ -702,7 +719,7 @@ def preimg(folder, i, row, headers, lat=None, lon=None):
         if raw_img == '' or str(raw_img) == 'nan':
             logging.info(f'{folder} sem a imagem para a linha {i}')
             return
-        if not os.path.exists(input_folder):
+        if not raw_img.lower().startswith('http') and not os.path.exists(input_folder):
             logging.error(f'A pasta {input_folder} não existe!')
             return
         if raw_img.lower().endswith('.jpg') or raw_img.lower().endswith('.jpeg'):
@@ -1021,8 +1038,9 @@ def kml_gen(csv_path):
                 cat = row['Cat']
         cat_count[cat] += 1
         logging.debug(f'Categoria definida como {cat}')
-
+        global esconde_nome
         esconde_nome = cat_hide[cat]
+        logging.debug(f'Esconder nome: {esconde_nome}')
 
         # Define o nome do ponto
         nome = f'Ponto {i + 1}'
@@ -1112,13 +1130,23 @@ def main():
         if pasta == 'icones' or pasta == 'venv' or not os.path.isdir(caminho):
             continue
         arquivos = os.listdir(caminho)
-
+        fotos_path = os.path.join(caminho, 'fotos')
+        fotos_csv = None
+        if os.path.exists(fotos_path) and os.path.isdir(fotos_path):
+            fotos_csv_file = next((arquivo for arquivo in os.listdir(fotos_path) if arquivo.endswith('metadados_geo.csv')), None)
+            if fotos_csv_file:
+                fotos_csv = os.path.join(fotos_path, fotos_csv_file)
         # Verifica se há arquivos com a extensão '.csv' e que não terminam com '_filtrado.csv'
         arquivos_csv = [arquivo for arquivo in arquivos if arquivo.endswith('.csv') and not arquivo.endswith('_filtrado.csv')]
 
         if not arquivos_csv:
             logging.info(f"Na pasta '{pasta}', não há arquivos '.csv'.")
-            continue
+            if fotos_csv:
+                logging.info(f'Copiando {fotos_csv} para a pasta {pasta}.')
+                shutil.copy(fotos_csv, os.path.join(caminho, fotos_csv_file))
+                arquivos_csv = [fotos_csv_file]
+            else:
+                continue
 
         for arquivo in arquivos_csv:
             caminho_csv = os.path.join(caminho, arquivo)
