@@ -1,7 +1,7 @@
 #! python3
+# Script para gerar arquivo kml a partir de uma tabela .csv ou de imagens com metadados de geolocalização
 
 versão = '2.7'
-
 banner = r'''
     ____  __._____.___.__________ ________    _______     ________________
     |    |/ _|\__  |   |\______   \\_____  \   \      \   /   __   \_____  \ 
@@ -32,7 +32,7 @@ with open("memento.txt", "w") as f:
     Para isso:
 	1. Instalar o python3.12 (ou superior) no computador;
 	2. Na pasta 'raiz', clicar com o botão direito do mouse, e selecionar 'Abrir no terminal';
-   	3. Digitar: 'python K93_install.py';
+   	3. Digitar: 'python K93-3_install.py';
 
     Será gerado o arquivo 'KYRON_93.bat', que servirá para a execução do script sem a necessidade da linha de comando.
 
