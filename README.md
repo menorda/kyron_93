@@ -1,13 +1,14 @@
-# kyron_93
-Conversor de arquivos csv em kml.
+
 
     ____  __._____.___.__________ ________    _______     ________________
     |    |/ _|\__  |   |\______   \\_____  \   \      \   /   __   \_____  \ 
     |      <   /   |   | |       _/ /   |   \  /   |   \  \____    / _(__  < 
     |    |  \  \____   | |    |   \/    |    \/    |    \    /    / /       \
     |____|__ \ / ______| |____|_  /\_______  /\____|__  /   /____/ /______  /
-            \/ \/               \/         \/         \/                  \/  2.2
+            \/ \/               \/         \/         \/                  \/  3.0
                                                                  csv -> kml
+
+
     ********************************** BEM-VINDO! **********************************
 
     Este é um script para gerar um arquivo '.kml' a partir de um arquivo '.csv'.
@@ -33,10 +34,11 @@ Conversor de arquivos csv em kml.
     O arquivo 'Conf.csv' é o arquivo de configuração, e deve estar na raiz.
     caso não exista, esse arquivo é gerado automaticamente.
     
-    É composto de três Headers:
+    É composto de quatro Headers:
     'Cat'............Indica o nome das categorias cadastradas.
     'Icone'..........Indica o nome do arquivo a ser usado como icone, ou o link ('http' ou 'https') para acesso ao icone.
     'Regex'..........Indica a regex a ser usada para categorização automática dos placemarks, a partir da descrição.
+    'Ocultar'........Indica se o nome de cada ponto dessa categoria deve aparecer permanentemente ou somente quando sobreposto pelo cursor. (True ou False)
     
     ************************************ ÍCONES ************************************
 
@@ -85,6 +87,9 @@ Conversor de arquivos csv em kml.
     6. Salvar a planilha no formato COMMA SEPARATED VALUES (.csv), com codificação 'utf-8', dentro da 'pasta do projeto';
     7. Executar o arquivo 'KYRON_93.bat'
 
+
+    Desenvolvido no 6º BIM, em SET 2024.
+    
     "OMNIA POSSIBILIA SUNT CREDENTI"
 
     MTM, em parceria com ChatGPT.
