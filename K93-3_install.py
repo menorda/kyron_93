@@ -1,7 +1,7 @@
 #! python3
-# Script para gerar arquivo kml a partir de uma tabela .csv ou de imagens com metadados de geolocalização
+# Script para conversão de arquivos csv em kml
 
-versão = '2.7'
+versão = '3.0'
 banner = r'''
     ____  __._____.___.__________ ________    _______     ________________
     |    |/ _|\__  |   |\______   \\_____  \   \      \   /   __   \_____  \ 
@@ -32,7 +32,7 @@ with open("memento.txt", "w") as f:
     Para isso:
 	1. Instalar o python3.12 (ou superior) no computador;
 	2. Na pasta 'raiz', clicar com o botão direito do mouse, e selecionar 'Abrir no terminal';
-   	3. Digitar: 'python K93-3_install.py';
+   	3. Digitar: 'python K93_install.py';
 
     Será gerado o arquivo 'KYRON_93.bat', que servirá para a execução do script sem a necessidade da linha de comando.
 
@@ -139,14 +139,25 @@ def criar_arquivo_bat():
 # Função para detectar a codificação do arquivo
 def preopen(arquivo):
     encode = 'UTF-8'
+    separador = ','
+
     try:
         with open(arquivo, 'rb') as file:
             raw_data = file.read()
             result = chardet.detect(raw_data)
             encode = result['encoding']
+
+        # Reabrindo o arquivo para detectar o separador
+        with open(arquivo, encoding=encode) as file:
+            primeira_linha = file.readline()
+            if ';' in primeira_linha:
+                separador = ';'
+
     except Exception as e:
-        print(f"Erro ao detectar a codificação: {e}")
-    return encode
+        print(f"Erro ao detectar a codificação ou separador: {e}. Usando ',' como separador.")
+
+    logging.info(f'Arquivo {arquivo} lido com codificação {encode} e separador \'{separador}\'.')
+    return encode, separador
 
 # Função para normalizar os cabeçalhos do CSV
 def normalize_headers(headers):
@@ -183,8 +194,8 @@ def normalize_headers(headers):
 # Função para ler e normalizar o CSV lido
 def ler_e_normalizar_csv(csv_path, limpar=None):
     try:
-        encoding = preopen(csv_path)
-        df_temp = pd.read_csv(csv_path, encoding=encoding, nrows=0)  # Lê apenas a primeira linha (cabeçalhos)
+        encoding, separador = preopen(csv_path)
+        df_temp = pd.read_csv(csv_path, encoding=encoding, nrows=0, delimiter=separador)  # Lê apenas a primeira linha (cabeçalhos)
         original_headers = df_temp.columns.tolist()
         
         # Normaliza os cabeçalhos
@@ -192,7 +203,7 @@ def ler_e_normalizar_csv(csv_path, limpar=None):
         normalized_headers = normalize_headers(original_headers)
         
         # Lê o CSV novamente, agora com cabeçalhos normalizados
-        df = pd.read_csv(csv_path, encoding=encoding, header=0)
+        df = pd.read_csv(csv_path, encoding=encoding, header=0, delimiter=separador)
         df.rename(columns=normalized_headers, inplace=True)
 
         if limpar != None:
@@ -438,6 +449,7 @@ def capturar(coord):
         except ValueError:
             logging.error(f'Coordenada inválida: {coord}')
             return
+    newcoord = round(newcoord, 6)
     return newcoord
 
 def get_datetime(img_path):
@@ -455,6 +467,7 @@ def get_datetime(img_path):
     def format_datetime(datetime_str):
         # O formato original do EXIF geralmente é "AAAA:MM:DD HH:MM:SS"
         date_part, time_part = datetime_str.split(" ")
+	# <--- PRECEDE, GUIA E LIDERA!
         date_part = date_part.replace(":", "-")  # Substitui ':' por '-' na data
         return (date_part, time_part)
     
@@ -467,7 +480,6 @@ def get_exif_data(img_path):
         img = Image.open(img_path)
     except:
         logging.error(f'A imagem {img} não pode ser aberta.')
-        # <--- PRECEDE, GUIA E LIDERA!
         return
     exif_data = {}
     info = img._getexif()
@@ -530,9 +542,9 @@ def autocat(texto, dicionario):
 
 # Função para leitura de headers
 def head_read(arquivo):
-    encoding = preopen(arquivo)
+    encoding, separador = preopen(arquivo)
     with open(arquivo, mode='r', newline='', encoding=encoding) as arquivo_csv:
-        leitor = csv.reader(arquivo_csv)
+        leitor = csv.reader(arquivo_csv, delimiter=separador)
         # Lê a primeira linha, que contém os headers
         headers = next(leitor, [])
         headers = normalize_headers(headers)
@@ -1044,11 +1056,18 @@ def kml_gen(csv_path):
 
         # Define o nome do ponto
         nome = f'Ponto {i + 1}'
+
+        # Verifica se 'Nome' está nos cabeçalhos
         if 'Nome' not in headers:
             if cat != 'Sem Categoria':
                 nome = f'{cat} {cat_count[cat]}'
-        elif row['Nome'] != '' and str(row['Nome']) != 'nan':
-            nome = row['Nome']
+            elif img_path:
+                nome = raw_img
+        else:
+            if row['Nome'] and str(row['Nome']).lower() != 'nan':
+                nome = row['Nome']
+            elif img_path:
+                nome = raw_img
             
         # Define a descrição    
         decri = row.get('Decri', cat)
